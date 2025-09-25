@@ -126,12 +126,22 @@ app.post('/api/whatsapp/send-bulk', async (req, res) => {
 });
 
 app.post('/api/whatsapp/disconnect', async (req, res) => {
-    if (sessionStatus === 'CONNECTED' && client) {
-        console.log('Disconnecting client...');
-        await client.logout();
+    try {
+        if (sessionStatus === 'CONNECTED' && client) {
+            console.log('Attempting to disconnect client...');
+            await client.logout();
+            console.log('Client successfully logged out.');
+        }
+    } catch (err) {
+        console.error('An error occurred during client logout:', err.message);
+        // Even if logout fails, we proceed to reset the state
+    } finally {
+        sessionStatus = 'DISCONNECTED';
+        client = null; // Clean up the client instance
+        qrCodeData = null; // Clean up QR code data
+        console.log('Session has been reset to DISCONNECTED.');
+        res.status(200).json({ success: true, message: 'Disconnection process finished.' });
     }
-    sessionStatus = 'DISCONNECTED';
-    res.status(200).json({ success: true, message: 'Client disconnected.' });
 });
 
 app.listen(port, () => {
