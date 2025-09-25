@@ -9,7 +9,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased limit for videos
+app.use(express.json({ limit: '10mb' }));
 
 let client;
 let sessionStatus = 'DISCONNECTED';
@@ -112,16 +112,8 @@ app.post('/api/whatsapp/send-bulk', async (req, res) => {
     (async () => {
         for (const item of messages) {
             try {
-                if (!item.phone || !item.mediaBase64 || !item.mimeType) {
-                    console.error('Skipping message due to incomplete data:', item);
-                    continue;
-                }
                 const chatId = `${item.phone.replace(/\D/g, '')}@c.us`;
-
-                // Sanitize the base64 string to remove potential data URL prefixes
-                const base64Data = item.mediaBase64.includes(',') ? item.mediaBase64.split(',')[1] : item.mediaBase64;
-
-                const media = new MessageMedia(item.mimeType, base64Data, 'personalized-media');
+                const media = new MessageMedia('image/png', item.imageBase64, 'personalized-image.png');
                 await client.sendMessage(chatId, media, { caption: item.message });
                 console.log(`Message successfully sent to ${item.phone}`);
                 await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
