@@ -9,7 +9,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' })); // Increased limit for videos
 
 let client;
 let sessionStatus = 'DISCONNECTED';
@@ -112,8 +112,16 @@ app.post('/api/whatsapp/send-bulk', async (req, res) => {
     (async () => {
         for (const item of messages) {
             try {
+                if (!item.phone || !item.mediaBase64 || !item.mimeType) {
+                    console.error('Skipping message due to incomplete data:', item);
+                    continue;
+                }
                 const chatId = `${item.phone.replace(/\D/g, '')}@c.us`;
-                const media = new MessageMedia('image/png', item.imageBase64, 'personalized-image.png');
+
+                // Sanitize the base64 string to remove potential data URL prefixes
+                const base64Data = item.mediaBase64.includes(',') ? item.mediaBase64.split(',')[1] : item.mediaBase64;
+
+                const media = new MessageMedia(item.mimeType, base64Data, 'personalized-media');
                 await client.sendMessage(chatId, media, { caption: item.message });
                 console.log(`Message successfully sent to ${item.phone}`);
                 await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
@@ -126,22 +134,12 @@ app.post('/api/whatsapp/send-bulk', async (req, res) => {
 });
 
 app.post('/api/whatsapp/disconnect', async (req, res) => {
-    try {
-        if (sessionStatus === 'CONNECTED' && client) {
-            console.log('Attempting to disconnect client...');
-            await client.logout();
-            console.log('Client successfully logged out.');
-        }
-    } catch (err) {
-        console.error('An error occurred during client logout:', err.message);
-        // Even if logout fails, we proceed to reset the state
-    } finally {
-        sessionStatus = 'DISCONNECTED';
-        client = null; // Clean up the client instance
-        qrCodeData = null; // Clean up QR code data
-        console.log('Session has been reset to DISCONNECTED.');
-        res.status(200).json({ success: true, message: 'Disconnection process finished.' });
+    if (sessionStatus === 'CONNECTED' && client) {
+        console.log('Disconnecting client...');
+        await client.logout();
     }
+    sessionStatus = 'DISCONNECTED';
+    res.status(200).json({ success: true, message: 'Client disconnected.' });
 });
 
 app.listen(port, () => {
